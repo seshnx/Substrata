@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -ExecutionPolicy Bypass -File build.ps1:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(cmd /c \"cd /d \"\"C:\\\\Users\\\\ricar\\\\Documents\\\\Amalia Media LLC\\\\Plugins\\\\Substrata\\\\build\\\\Substrata_artefacts\\\\Release\\\\Standalone\"\" && \"\"SeshNx Substrata.exe\"\"\")",
+      "Bash(cmd /c \"start /wait \"\"\"\" \"\"C:\\\\Users\\\\ricar\\\\Documents\\\\Amalia Media LLC\\\\Plugins\\\\Substrata\\\\build\\\\Substrata_artefacts\\\\Release\\\\Standalone\\\\SeshNx Substrata.exe\"\" & echo Exit code: %ERRORLEVEL%\")",
+      "Bash(cmd /c:*)",
+      "Bash(cmake --build:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\ricar\\\\Documents\\\\Amalia Media LLC\\\\Plugins\\\\Substrata\\\\build.ps1\")",
+      "Bash(dir:*)",
+      "Bash(git init:*)"
+    ]
+  }
+}
