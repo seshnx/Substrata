@@ -4,7 +4,13 @@ project(Substrata VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# AAX SDK Path
+set(AAX_SDK_PATH "C:/aax-sdk-2-9-0" CACHE PATH "Path to AAX SDK")
+
 add_subdirectory(JUCE)
+
+# Set AAX SDK path
+juce_set_aax_sdk_path(${AAX_SDK_PATH})
 
 # Binary resources (for logo and other assets)
 juce_add_binary_data(Substrata_BinaryData
@@ -17,7 +23,7 @@ juce_add_plugin(Substrata
     COMPANY_NAME "Amalia Media LLC"
     PLUGIN_MANUFACTURER_CODE Amal
     PLUGIN_CODE Sesh
-    FORMATS VST3 AU Standalone
+    FORMATS VST3 AU Standalone AAX
     PRODUCT_NAME "SeshNx Substrata"
     DESCRIPTION "Harmonic Shifter with Microtonal Control"
     VERSION "1.0.0"
