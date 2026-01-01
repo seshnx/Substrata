@@ -1,6 +1,10 @@
-# SeshNx Substrata - Harmonic Shifter Plugin
+# SeshNx Substrata
+
+**Harmonic Shifter Plugin**
 
 A VST3/AU audio plugin built with JUCE that dynamically tracks the fundamental frequency (f0) and allows for microtonal shifting of generated overtones.
+
+**Part of the SeshNx Plugin Suite by Amalia Media LLC**
 
 ## Features
 
@@ -83,5 +87,23 @@ A VST3/AU audio plugin built with JUCE that dynamically tracks the fundamental f
 
 ## License
 
-Copyright (c) Amalia Media LLC
+Copyright (c) 2024 Amalia Media LLC. All rights reserved.
+
+Proprietary software - Distribution prohibited without explicit permission.
+
+---
+
+## Version
+
+**v1.0.0**
+
+---
+
+## Support
+
+For technical support, bug reports, or feature requests, please contact the development team through official SeshNx channels.
+
+---
+
+*Part of the [SeshNx Plugin Suite](https://seshnx.com) by Amalia Media LLC*
 
