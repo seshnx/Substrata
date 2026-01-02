@@ -1,0 +1,257 @@
+name: Build All Platforms
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ============================================================
+  # macOS Build - Universal Binary (arm64 + x86_64)
+  # ============================================================
+  build-macos:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: brew install cmake ninja
+
+      - name: Configure CMake (Universal Binary)
+        run: |
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET="10.15"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Prepare macOS artifacts
+        run: |
+          mkdir -p artifacts/macos
+          # Copy the VST3 bundle
+          find build -name "*.vst3" -type d -exec cp -R {} artifacts/macos/ \;
+          # Copy AU bundle
+          find build -name "*.component" -type d -exec cp -R {} artifacts/macos/ \;
+          # Copy Standalone app
+          find build -name "Substrata.app" -type d -exec cp -R {} artifacts/macos/ \;
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-macos
+          path: artifacts/macos/
+          retention-days: 7
+
+  # ============================================================
+  # Windows Build - x86_64
+  # ============================================================
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Prepare Windows artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/windows
+          # Find and copy VST3
+          $vst3Path = Get-ChildItem -Path build -Filter "*.vst3" -Recurse -Directory | Select-Object -First 1
+          if ($vst3Path) {
+            Copy-Item -Path $vst3Path.FullName -Destination artifacts/windows/ -Recurse
+          }
+          # Find and copy Standalone
+          $exePath = Get-ChildItem -Path build -Filter "Substrata.exe" -Recurse | Select-Object -First 1
+          if ($exePath) {
+            Copy-Item -Path $exePath.FullName -Destination artifacts/windows/
+          }
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-windows
+          path: artifacts/windows/
+          retention-days: 7
+
+  # ============================================================
+  # Linux Build - x86_64
+  # ============================================================
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            libasound2-dev \
+            libjack-jackd2-dev \
+            ladspa-sdk \
+            libcurl4-openssl-dev \
+            libfreetype6-dev \
+            libx11-dev \
+            libxcomposite-dev \
+            libxcursor-dev \
+            libxext-dev \
+            libxinerama-dev \
+            libxrandr-dev \
+            libxrender-dev \
+            libwebkit2gtk-4.1-dev \
+            libglu1-mesa-dev \
+            mesa-common-dev
+
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Prepare Linux artifacts
+        run: |
+          mkdir -p artifacts/linux
+          # Find and copy VST3
+          find build -name "*.vst3" -type d -exec cp -R {} artifacts/linux/ \;
+          # Find and copy Standalone
+          find build -type f -name "Substrata" -executable -exec cp {} artifacts/linux/ \;
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-linux
+          path: artifacts/linux/
+          retention-days: 7
+
+  # ============================================================
+  # Assemble Universal VST3 Bundle
+  # ============================================================
+  assemble-bundle:
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: builds/
+
+      - name: Assemble universal VST3 bundle
+        run: |
+          # Create the universal bundle structure
+          BUNDLE="Substrata.vst3"
+          mkdir -p "$BUNDLE/Contents/Resources"
+
+          # --- macOS binary ---
+          if [ -d "builds/build-macos/Substrata.vst3/Contents/MacOS" ]; then
+            mkdir -p "$BUNDLE/Contents/MacOS"
+            cp -R builds/build-macos/Substrata.vst3/Contents/MacOS/* "$BUNDLE/Contents/MacOS/"
+          fi
+
+          # Copy Info.plist and PkgInfo from macOS build
+          if [ -f "builds/build-macos/Substrata.vst3/Contents/Info.plist" ]; then
+            cp builds/build-macos/Substrata.vst3/Contents/Info.plist "$BUNDLE/Contents/"
+          fi
+          if [ -f "builds/build-macos/Substrata.vst3/Contents/PkgInfo" ]; then
+            cp builds/build-macos/Substrata.vst3/Contents/PkgInfo "$BUNDLE/Contents/"
+          fi
+
+          # Copy Resources from macOS build (moduleinfo.json, etc.)
+          if [ -d "builds/build-macos/Substrata.vst3/Contents/Resources" ]; then
+            cp -R builds/build-macos/Substrata.vst3/Contents/Resources/* "$BUNDLE/Contents/Resources/" 2>/dev/null || true
+          fi
+
+          # --- Windows x86_64 binary ---
+          if [ -d "builds/build-windows/Substrata.vst3/Contents/x86_64-win" ]; then
+            mkdir -p "$BUNDLE/Contents/x86_64-win"
+            cp -R builds/build-windows/Substrata.vst3/Contents/x86_64-win/* "$BUNDLE/Contents/x86_64-win/"
+          fi
+
+          # --- Linux x86_64 binary ---
+          if [ -d "builds/build-linux/Substrata.vst3/Contents/x86_64-linux" ]; then
+            mkdir -p "$BUNDLE/Contents/x86_64-linux"
+            cp -R builds/build-linux/Substrata.vst3/Contents/x86_64-linux/* "$BUNDLE/Contents/x86_64-linux/"
+          fi
+
+          # Show final structure
+          echo "=== Universal VST3 Bundle Structure ==="
+          find "$BUNDLE" -type f | head -50
+
+          # Create output directories for each platform
+          mkdir -p output/VST3
+          mkdir -p output/macOS
+          mkdir -p output/Windows
+          mkdir -p output/Linux
+
+          # Copy universal bundle
+          cp -R "$BUNDLE" output/VST3/
+
+          # Copy platform-specific standalones
+          if [ -d "builds/build-macos/Substrata.app" ]; then
+            cp -R builds/build-macos/Substrata.app output/macOS/
+          fi
+          if [ -d "builds/build-macos/Substrata.component" ]; then
+            cp -R builds/build-macos/Substrata.component output/macOS/
+          fi
+          if [ -f "builds/build-windows/Substrata.exe" ]; then
+            cp builds/build-windows/Substrata.exe output/Windows/
+          fi
+          if [ -f "builds/build-linux/Substrata" ]; then
+            cp builds/build-linux/Substrata output/Linux/
+          fi
+
+      - name: Upload Universal VST3 Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Substrata-Universal-VST3
+          path: output/VST3/
+          retention-days: 30
+
+      - name: Upload macOS Extras (AU + Standalone)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Substrata-macOS-Extras
+          path: output/macOS/
+          retention-days: 30
+
+      - name: Upload Windows Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: Substrata-Windows-Standalone
+          path: output/Windows/
+          retention-days: 30
+
+      - name: Upload Linux Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: Substrata-Linux-Standalone
+          path: output/Linux/
+          retention-days: 30
